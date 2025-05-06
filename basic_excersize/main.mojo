@@ -43,3 +43,41 @@ def main():
         out_tensor, grid_dim=blocks, block_dim=threads,
     )
     ctx.synchronize()
+
+    fn sum_reduce_kernel(
+        in_tensor: InTensor, out_tensor: OutTensor
+    ):
+        # This allocates memory to be shared between threads in a block prior to the
+        # kernel launching. Each kernel gets a pointer to the allocated memory.
+        var shared = stack_allocation[
+            threads,
+            Scalar[dtype],
+            address_space = AddressSpace.SHARED,
+        ]()
+
+        # Place the corresponding value into shared memory
+        shared[thread_idx.x] = in_tensor[block_idx.x, thread_idx.x][0]
+
+        # Await all the threads to finish loading their values into shared memory
+        barrier()
+
+        # If this is the first thread, sum and write the result to global memory
+        if thread_idx.x == 0:
+            for i in range(threads):
+                out_tensor[block_idx.x] += shared[i]
+
+    ctx.enqueue_function[sum_reduce_kernel](
+        in_tensor,
+        out_tensor,
+        grid_dim=blocks,
+        block_dim=threads,
+    )
+
+    # Copy the data back to the host and print out the buffer
+    with out_buffer.map_to_host() as host_buffer:
+        print(host_buffer)
+        
+    ctx.enqueue_function[print_values_kernel](
+        out_tensor, grid_dim=blocks, block_dim=threads,
+    )
+    ctx.synchronize()
