@@ -1,5 +1,5 @@
 from gpu import thread_idx, block_idx, warp, barrier
-from gpu.host import DeviceContext, DeviceBuffer, HostBuffer
+from gpu.host import DeviceContext, DeviceBuffer
 from gpu.memory import AddressSpace
 from memory import stack_allocation
 from layout import Layout, LayoutTensor
@@ -37,7 +37,7 @@ def main():
     fn print_values_kernel(out_tensor: OutTensor):
         var bid = block_idx.x
         var tid = thread_idx.x
-        print("block:", bid, "thread:", tid, "val:", in_tensor[bid, tid])
+        print("block:", bid, "thread:", tid, "val:", out_tensor[bid, tid])
 
     ctx.enqueue_function[print_values_kernel](
         out_tensor, grid_dim=blocks, block_dim=threads,
