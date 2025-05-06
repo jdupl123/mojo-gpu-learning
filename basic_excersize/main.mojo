@@ -7,10 +7,29 @@ from math import iota
 from sys import sizeof
 
 def main():
-    fn printing_kernel():
-        print("GPU thread: [", thread_idx.x, thread_idx.y, thread_idx.z, "]")
-
     var ctx = DeviceContext()
+    alias dtype = DType.float32
+    alias blocks = 8
+    alias threads = 4
+    alias elements_in = blocks * threads # one element per thread
 
-    ctx.enqueue_function[printing_kernel](grid_dim=1, block_dim=4)
+    var in_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
+
+    with in_buffer.map_to_host() as host_buffer:
+        iota(host_buffer.unsafe_ptr(), elements_in)
+        print(host_buffer)
+
+    alias layout = Layout.row_major(blocks, threads)
+
+    var in_tensor = LayoutTensor[dtype, layout](in_buffer)
+    alias InTensor = LayoutTensor[dtype, layout, MutableAnyOrigin]
+
+    fn print_values_kernel(in_tensor: InTensor):
+    var bid = block_idx.x
+    var tid = thread_idx.x
+    print("block:", bid, "thread:", tid, "val:", in_tensor[bid, tid])
+
+    ctx.enqueue_function[print_values_kernel](
+        in_tensor, grid_dim=blocks, block_dim=threads,
+    )
     ctx.synchronize()
