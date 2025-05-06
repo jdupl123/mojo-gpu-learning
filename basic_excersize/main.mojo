@@ -24,12 +24,22 @@ def main():
     var in_tensor = LayoutTensor[dtype, layout](in_buffer)
     alias InTensor = LayoutTensor[dtype, layout, MutableAnyOrigin]
 
-    fn print_values_kernel(in_tensor: InTensor):
-    var bid = block_idx.x
-    var tid = thread_idx.x
-    print("block:", bid, "thread:", tid, "val:", in_tensor[bid, tid])
+    var out_buffer = ctx.enqueue_create_buffer[dtype](blocks)
+
+    # Zero the values on the device as they'll be used to accumulate results
+    ctx.enqueue_memset(out_buffer, 0)
+
+    alias out_layout = Layout.row_major(elements_in)
+    alias OutTensor = LayoutTensor[dtype, out_layout, MutableAnyOrigin]
+
+    var out_tensor = OutTensor(out_buffer)
+
+    fn print_values_kernel(out_tensor: OutTensor):
+        var bid = block_idx.x
+        var tid = thread_idx.x
+        print("block:", bid, "thread:", tid, "val:", in_tensor[bid, tid])
 
     ctx.enqueue_function[print_values_kernel](
-        in_tensor, grid_dim=blocks, block_dim=threads,
+        out_tensor, grid_dim=blocks, block_dim=threads,
     )
     ctx.synchronize()
